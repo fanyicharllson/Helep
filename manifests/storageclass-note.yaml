@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# StorageClass — Part C
+#
+# We rely on the cluster default StorageClass.
+#
+# Minikube:  "standard"   (hostPath provisioner — adequate for dev)
+# k3s:       "local-path" (Rancher local-path-provisioner)
+#
+# Both are single-node, ReadWriteOnce. For production you would use a
+# cloud-backed StorageClass (e.g. do-block-storage on DigitalOcean) with
+# ReadWriteOnce and a Retain reclaim policy to survive pod restarts.
+#
+# We do NOT redefine the default StorageClass here — PVCs in the Helm chart
+# omit storageClassName which causes K8s to use the cluster default
+# (annotated storageclass.kubernetes.io/is-default-class: "true").
+# ─────────────────────────────────────────────────────────────────────────────
+
+# This manifest is a reference declaration only.
+# To see the active default on your cluster run:
+#   kubectl get storageclass
+#   kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}'

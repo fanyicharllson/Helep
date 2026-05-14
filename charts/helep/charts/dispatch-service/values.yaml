@@ -1,0 +1,19 @@
+image:
+  repository: "charllson717/helep-dispatch-service"
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+replicaCount: 1
+servicePort: 8003
+kafkaBootstrap: "helep-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
+matcherStrategy: "nearest"
+jwtSecret: "change-me-in-production"
+env:
+  SERVICE_PORT: "8003"
+  DB_PATH: "/data/dispatch.db"
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"

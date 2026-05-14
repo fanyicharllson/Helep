@@ -1,0 +1,179 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// HELEP CI/CD Pipeline — Part F
+// Jenkinsfile (Declarative)
+// ─────────────────────────────────────────────────────────────────────────────
+
+def SERVICES = ['user-service', 'sos-service', 'dispatch-service', 'notification-service', 'analytics-service']
+def IMAGE_TAG = "0.1.${env.BUILD_NUMBER}"
+def REGISTRY  = "charllson717"
+
+pipeline {
+    agent any
+
+    environment {
+        DOCKER_REGISTRY = "${REGISTRY}"
+        TAG              = "${IMAGE_TAG}"
+    }
+
+    stages {
+
+        // ── Stage 1: Lint Python ──────────────────────────────────────────────
+        stage('Lint Python') {
+            steps {
+                script {
+                    SERVICES.each { svc ->
+                        sh """
+                            pip install ruff --quiet
+                            ruff check services/${svc}/app/
+                        """
+                    }
+                }
+            }
+        }
+
+        // ── Stage 2: Build Docker images ──────────────────────────────────────
+        stage('Build Images') {
+            steps {
+                script {
+                    SERVICES.each { svc ->
+                        sh """
+                            docker build \
+                                -t ${REGISTRY}/helep-${svc}:${IMAGE_TAG} \
+                                -f services/${svc}/Dockerfile \
+                                services/${svc}/
+                        """
+                    }
+                }
+            }
+        }
+
+        // ── Stage 3: Trivy image scan (fail on HIGH+) ─────────────────────────
+        stage('Trivy Scan') {
+            steps {
+                script {
+                    SERVICES.each { svc ->
+                        sh """
+                            trivy image \
+                                --severity HIGH,CRITICAL \
+                                --exit-code 1 \
+                                --no-progress \
+                                ${REGISTRY}/helep-${svc}:${IMAGE_TAG}
+                        """
+                    }
+                }
+            }
+            post {
+                failure {
+                    error "Trivy found HIGH or CRITICAL vulnerabilities — pipeline aborted."
+                }
+            }
+        }
+
+        // ── Stage 4: Push to Docker Hub ───────────────────────────────────────
+        stage('Push Images') {
+            steps {
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'DOCKER_USER',
+                    passwordVariable: 'DOCKER_PASS'
+                )]) {
+                    sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                    script {
+                        SERVICES.each { svc ->
+                            sh "docker push ${REGISTRY}/helep-${svc}:${IMAGE_TAG}"
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Stage 5: Helm deploy to cluster ───────────────────────────────────
+        stage('Helm Deploy') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-helep', variable: 'KUBECONFIG')]) {
+                    sh """
+                        helm upgrade --install helep ./charts/helep \
+                            --namespace helep \
+                            --create-namespace \
+                            --set user-service.image.tag=${IMAGE_TAG} \
+                            --set sos-service.image.tag=${IMAGE_TAG} \
+                            --set dispatch-service.image.tag=${IMAGE_TAG} \
+                            --set notification-service.image.tag=${IMAGE_TAG} \
+                            --set analytics-service.image.tag=${IMAGE_TAG} \
+                            --wait \
+                            --timeout 5m
+                    """
+                }
+            }
+        }
+
+        // ── Stage 6: Smoke test — /healthz on every service ──────────────────
+        stage('Smoke Test') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-helep', variable: 'KUBECONFIG')]) {
+                    script {
+                        def portMap = [
+                            'user-service': 8001,
+                            'sos-service': 8002,
+                            'dispatch-service': 8003,
+                            'notification-service': 8004,
+                            'analytics-service': 8005
+                        ]
+                        SERVICES.each { svc ->
+                            def port = portMap[svc]
+                            sh """
+                                kubectl run smoke-${svc.replace('-','')}-${env.BUILD_NUMBER} \
+                                    --image=curlimages/curl:8.7.1 \
+                                    --restart=Never \
+                                    --rm \
+                                    --attach \
+                                    -n helep \
+                                    -- curl -sf http://${svc}:${port}/healthz
+                            """
+                        }
+                    }
+                }
+            }
+        }
+
+        // ── Stage 7: Manual approval before prod ──────────────────────────────
+        stage('Approve Prod') {
+            steps {
+                input message: "Deploy helep:${IMAGE_TAG} to PROD namespace?",
+                      ok: "Yes, deploy to prod",
+                      submitter: "admin"
+            }
+        }
+
+        stage('Deploy Prod') {
+            steps {
+                withCredentials([file(credentialsId: 'kubeconfig-helep', variable: 'KUBECONFIG')]) {
+                    sh """
+                        helm upgrade --install helep-prod ./charts/helep \
+                            --namespace helep-prod \
+                            --create-namespace \
+                            --set user-service.image.tag=${IMAGE_TAG} \
+                            --set sos-service.image.tag=${IMAGE_TAG} \
+                            --set dispatch-service.image.tag=${IMAGE_TAG} \
+                            --set notification-service.image.tag=${IMAGE_TAG} \
+                            --set analytics-service.image.tag=${IMAGE_TAG} \
+                            --wait \
+                            --timeout 5m
+                    """
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo "HELEP pipeline complete — images tagged ${IMAGE_TAG}"
+        }
+        failure {
+            echo "Pipeline failed — check logs above"
+        }
+        always {
+            sh "docker logout || true"
+        }
+    }
+}

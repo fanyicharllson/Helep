@@ -1,0 +1,107 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# HELEP Umbrella Chart — values.yaml
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Shared Kafka bootstrap — Strimzi-managed in K8s (Part D)
+kafkaBootstrap: "helep-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
+
+# Ingress host (add to /etc/hosts for Minikube: <minikube-ip> helep.local)
+ingressHost: "helep.local"
+
+# Responder matching strategy: nearest | random | zone_priority
+matcherStrategy: "nearest"
+
+# ── user-service ──────────────────────────────────────────────────────────────
+user-service:
+  image:
+    repository: "charllson717/helep-user-service"
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  servicePort: 8001
+  env:
+    SERVICE_PORT: "8001"
+    DB_PATH: "/data/user.db"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# ── sos-service ───────────────────────────────────────────────────────────────
+sos-service:
+  image:
+    repository: "charllson717/helep-sos-service"
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  servicePort: 8002
+  env:
+    SERVICE_PORT: "8002"
+    DB_PATH: "/data/sos.db"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# ── dispatch-service ──────────────────────────────────────────────────────────
+dispatch-service:
+  image:
+    repository: "charllson717/helep-dispatch-service"
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  servicePort: 8003
+  env:
+    SERVICE_PORT: "8003"
+    DB_PATH: "/data/dispatch.db"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# ── notification-service ──────────────────────────────────────────────────────
+notification-service:
+  image:
+    repository: "charllson717/helep-notification-service"
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  servicePort: 8004
+  env:
+    SERVICE_PORT: "8004"
+    DB_PATH: "/data/notification.db"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"
+
+# ── analytics-service ─────────────────────────────────────────────────────────
+analytics-service:
+  image:
+    repository: "charllson717/helep-analytics-service"
+    tag: "0.1.0"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  servicePort: 8005
+  env:
+    SERVICE_PORT: "8005"
+    DB_PATH: "/data/analytics.db"
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "128Mi"
+    limits:
+      cpu: "500m"
+      memory: "256Mi"

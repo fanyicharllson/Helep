@@ -1,0 +1,154 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# NetworkPolicy manifests for HELEP — Part C
+#
+# Strategy: default-deny all ingress, then explicitly allow:
+#   1. NGINX Ingress controller (namespace: ingress-nginx)
+#   2. Prometheus scraper (namespace: observability)
+#   3. Inter-service calls within helep namespace (same label selector)
+#   4. Kafka brokers (namespace: kafka)
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Default deny ALL ingress in helep namespace ───────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: helep
+spec:
+  podSelector: {}        # matches every pod in helep namespace
+  policyTypes:
+    - Ingress
+---
+# ── user-service ──────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-user-service
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app: user-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow NGINX Ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8001
+    # Allow Prometheus scraper
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8001
+---
+# ── sos-service ───────────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-sos-service
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app: sos-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8002
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8002
+---
+# ── dispatch-service ──────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dispatch-service
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app: dispatch-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # dispatch only needs Prometheus (no direct HTTP from Ingress)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8003
+    # Allow health checks from within helep (e.g. readyz probe from other pods)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: helep
+      ports:
+        - port: 8003
+---
+# ── notification-service ──────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-notification-service
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app: notification-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8004
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: helep
+      ports:
+        - port: 8004
+---
+# ── analytics-service ─────────────────────────────────────────────────────────
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-analytics-service
+  namespace: helep
+spec:
+  podSelector:
+    matchLabels:
+      app: analytics-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - port: 8005
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: observability
+      ports:
+        - port: 8005

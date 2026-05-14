@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: helep
+  labels:
+    name: helep
+    app.kubernetes.io/part-of: helep

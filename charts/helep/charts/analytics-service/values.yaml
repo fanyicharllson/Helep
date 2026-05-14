@@ -1,0 +1,19 @@
+image:
+  repository: "charllson717/helep-analytics-service"
+  tag: "0.1.0"
+  pullPolicy: IfNotPresent
+replicaCount: 1
+servicePort: 8005
+kafkaBootstrap: "helep-kafka-kafka-bootstrap.kafka.svc.cluster.local:9092"
+matcherStrategy: "nearest"
+jwtSecret: "change-me-in-production"
+env:
+  SERVICE_PORT: "8005"
+  DB_PATH: "/data/analytics.db"
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"

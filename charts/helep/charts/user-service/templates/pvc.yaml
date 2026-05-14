@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: user-service-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: user-service
+    app.kubernetes.io/part-of: helep
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # Uses cluster default StorageClass (standard on Minikube / local-path on k3s).
+  # Explicitly leaving storageClassName empty inherits the default — cite in design doc.
